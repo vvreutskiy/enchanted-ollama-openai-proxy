@@ -76,7 +76,6 @@ func main() {
 	}
 
 	if env := os.Getenv("CACHE_MODEL_LIST"); env == "true" {
-		fetchAndCacheModels(provider)
 		slog.Info("Cache model list is enabled")
 		launchModelCacheUpdater(provider)
 	} else {
