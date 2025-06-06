@@ -1,0 +1,28 @@
+services:
+  ollama-proxy-openrouter:
+    container_name: ollama-proxy-openrouter
+    image: ollama-proxy
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    environment:
+      - OPENAI_API_KEY=$OPENROUTER_API_KEY
+    ports:
+      - "11434:11434"
+    restart: unless-stopped
+    volumes:
+      - ./models-filter.txt:/app/models-filter
+
+  ollama-proxy-openwebui:
+    container_name: ollama-proxy-openwebui
+    image: ollama-proxy
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    environment:
+      - OPENAI_API_KEY=$OPENWEBUI_API_KEY
+      - OPENAI_API_BASE=$OPENWEBUI_API_BASE
+      - CACHE_MODEL_LIST=true
+    ports:
+      - "11435:11434"
+    restart: unless-stopped

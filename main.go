@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -74,6 +75,14 @@ func main() {
 		}
 	}
 
+	if env := os.Getenv("CACHE_MODEL_LIST"); env == "true" {
+		fetchAndCacheModels(provider)
+		slog.Info("Cache model list is enabled")
+		launchModelCacheUpdater(provider)
+	} else {
+		slog.Info("Cache model list is disabled")
+	}
+
 	r.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "Ollama is running")
 	})
@@ -82,11 +91,18 @@ func main() {
 	})
 
 	r.GET("/api/tags", func(c *gin.Context) {
-		models, err := provider.GetModels()
-		if err != nil {
-			slog.Error("Error getting models", "Error", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
+		var models []Model
+		if env := os.Getenv("CACHE_MODEL_LIST"); env == "true" {
+			modelsCacheLock.Lock()
+			models = modelsCache
+			modelsCacheLock.Unlock()
+		} else {
+			models, err = provider.GetModels()
+			if err != nil {
+				slog.Error("Error getting models", "Error", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
 		}
 		filter := modelFilter
 		// Construct a new array of model objects with extra fields
@@ -195,8 +211,8 @@ func main() {
 
 			// Create Ollama-compatible response
 			ollamaResponse := map[string]interface{}{
-				"model":             fullModelName,
-				"created_at":        time.Now().Format(time.RFC3339),
+				"model":      fullModelName,
+				"created_at": time.Now().Format(time.RFC3339),
 				"message": map[string]string{
 					"role":    "assistant",
 					"content": content,
@@ -309,8 +325,8 @@ func main() {
 
 		// ВАЖНО: Замените nil на 0 для числовых полей статистики
 		finalResponse := map[string]interface{}{
-			"model":             fullModelName,
-			"created_at":        time.Now().Format(time.RFC3339),
+			"model":      fullModelName,
+			"created_at": time.Now().Format(time.RFC3339),
 			"message": map[string]string{
 				"role":    "assistant",
 				"content": "", // Пустой контент для финального сообщения
@@ -342,4 +358,34 @@ func main() {
 	})
 
 	r.Run(":11434")
+}
+
+var (
+	modelsCache     []Model
+	modelsCacheLock sync.RWMutex
+)
+
+func fetchAndCacheModels(provider *OpenrouterProvider) {
+	models, err := provider.GetModels()
+	if err != nil {
+		slog.Error("Failed to fetch models from provider", "error", err)
+		return
+	}
+	modelsCacheLock.Lock()
+	modelsCache = models
+	modelsCacheLock.Unlock()
+	slog.Info("Updated models cache", "count", len(models))
+}
+
+func launchModelCacheUpdater(provider *OpenrouterProvider) {
+	// Initial fetch
+	fetchAndCacheModels(provider)
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for {
+			<-ticker.C
+			fetchAndCacheModels(provider)
+		}
+	}()
 }

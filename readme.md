@@ -22,6 +22,8 @@ You can provide your **OpenRouter** (OpenAI-compatible) API key through an envir
 ### 1. Environment Variable
 
     export OPENAI_API_KEY="your-openrouter-api-key"
+    # export OPENAI_API_BASE=https://some-openai-compatible-api/api
+    # export CACHE_MODEL_LIST=true # openwebui have slow api/v1/models response time
     ./ollama-proxy
 
 ### 2. Command Line Argument

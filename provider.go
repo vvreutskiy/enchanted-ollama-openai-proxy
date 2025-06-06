@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -16,7 +17,11 @@ type OpenrouterProvider struct {
 
 func NewOpenrouterProvider(apiKey string) *OpenrouterProvider {
 	config := openai.DefaultConfig(apiKey)
-	config.BaseURL = "https://openrouter.ai/api/v1/" // Custom endpoint if needed
+	baseURL := os.Getenv("OPENAI_API_BASE")
+	if baseURL == "" {
+		baseURL = "https://openrouter.ai/api/v1/"
+	}
+	config.BaseURL = baseURL
 	return &OpenrouterProvider{
 		client:     openai.NewClientWithConfig(config),
 		modelNames: []string{},
